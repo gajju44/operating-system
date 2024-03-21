@@ -1,0 +1,68 @@
+#include<stdio.h>
+#include<pthread.h>
+
+typedef struct
+{
+	pthread_mutex_t mutex;
+	pthread_cond_t cond;
+	int count;
+}semaphore_t;
+
+void init_semaphore(semaphore_t*sem,int initial_count)
+{
+	pthread_mutex_init(&sem->mutex,NULL);
+	pthread_cond_init(&sem->cond,NULL);
+	sem->count=initial_count;
+}
+void wait_semaphore(semaphore_t*sem)
+{
+	pthread_mutex_lock(&sem->mutex);
+	while(sem->count<=0){
+		pthread_cond_wait(&sem->cond,&sem->mutex);
+	}
+	sem->count--;
+	pthread_mutex_unlock(&sem->mutex);
+}
+void signal_semaphore(semaphore_t*sem){
+	pthread_mutex_lock(&sem->mutex);
+	sem->count++;
+	pthread_cond_signal(&sem->cond);
+	pthread_mutex_unlock(&sem->mutex);
+}
+void destroy_semaphore(semaphore_t*sem){
+	pthread_mutex_destroy(&sem->mutex);
+	pthread_cond_destroy(&sem->cond);
+}
+semaphore_t my_semaphore;
+
+void*thread_function(void*arg)
+{
+	int thread_id=*((int*)arg);
+		printf("Thread %d waiting on semaphore\n",thread_id);
+		
+		wait_semaphore(&my_semaphore);
+		printf("Thread %d acquired semaphore\n",thread_id);
+		
+		printf("Thread %d is in critical section\n",thread_id);
+		signal_semaphore(&my_semaphore);
+		printf("Thread %d released semaphore\n",thread_id);
+	pthread_exit(NULL);
+	
+}
+int main(){
+	int num_threads=3;
+	pthread_t threads[num_threads];
+	int thread_ids[num_threads];
+	
+	init_semaphore(&my_semaphore,1);
+	
+	for(int i=0;i<num_threads;++i){
+		thread_ids[i]=i;
+		pthread_create(&threads[i],NULL,thread_function,&thread_ids[i]);
+	}
+	for(int i=0;i<num_threads;++i){
+		pthread_join(threads[i],NULL);
+	}
+	destroy_semaphore(&my_semaphore);
+	return 0;
+}
